@@ -1,8 +1,15 @@
-from contextlib import contextmanager
 import json
+import os
+import math
+import threading
 import psycopg2.pool
-from lantern_client import QueryBuilder, SyncClient 
-from utils import chunks, default_max_db_connections, dotdict, norm, translate_to_pyformat
+import pinecone
+from contextlib import contextmanager
+from typing import List, Optional
+from pinecone.core.client.model.vector import Vector
+from tqdm import tqdm
+from lantern import QueryBuilder, SyncClient 
+from lantern.utils import chunks, default_max_db_connections, dotdict, norm, translate_to_pyformat
 
 global_pool = None
 indexes_table_name = "lantern_indexes"
@@ -12,7 +19,7 @@ class IndexStatusReady():
         self.status = { "ready": True }
 
 class Index():
-    def __init__(self, index_name: str, pool=None, dimensions: int = 3, metric: str = "euclidean") -> None:
+    def __init__(self, index_name: str, pool=None, dimensions: int = 3, metric: str = "euclidean", m: Optional[int] = 12, ef: Optional[int] = 64, ef_construction: Optional[int] = 64) -> None:
         self.pool = pool or global_pool
         self.name = index_name
         self.namespace_clients = {}
@@ -25,10 +32,14 @@ class Index():
         self.dimensions = info['dimensions']
         self.metric = info['metric']
         for namespace in self._get_namespaces():
-            self.namespace_clients[namespace] = SyncClient(pool=self.pool, table_name=f"{self.name}_{namespace}", dimensions=dimensions, distance_type=metric)
+            table_name = self.name if namespace == "" else f"{self.name}_{namespace}"
+            self.namespace_clients[namespace] = SyncClient(pool=self.pool, table_name=table_name, dimensions=dimensions, distance_type=metric, m=m, ef=ef, ef_construction=ef_construction)
 
     @contextmanager
     def _connect(self):
+        if self.pool is None:
+            raise(Exception("Client is not initialized"))
+
         connection = self.pool.getconn()
         try:
             yield connection
@@ -69,6 +80,14 @@ class Index():
                 cur.execute("SELECT name FROM {table_name}".format(table_name=self.namespace_table_name))
                 return list(map(lambda x: x[0], cur.fetchall()))
 
+    def _init_index_tables(self):
+        for client in self.namespace_clients.values():
+            client.create_table()
+
+    def _init_index_indices(self):
+        for client in self.namespace_clients.values():
+            client.create_index()
+            
     def _init_index(self):
         for client in self.namespace_clients.values():
             client.create_table()
@@ -84,10 +103,14 @@ class Index():
     def upsert(self, vectors, copy=False, namespace=''):
         values = []
         for data in vectors:
-            if type(data) is dict:
+            if type(data) is dict: 
                 id = data.get('id')
                 metadata = data.get('metadata')
                 vec = data.get('values')
+            elif isinstance(data, Vector):
+                id = data.id
+                metadata = data.metadata
+                vec = data.values
             else:
                 id = data[0]
                 vec = data[1]
@@ -136,7 +159,7 @@ class Index():
             meta_idx = select_fields.index('metadata')
         
         data = self._get_client(namespace).search(id, vector, top_k, filter, select_fields)
-        matches = list(map(lambda x: dotdict({ "id": x[0], "score": norm(x[len(x) - 1], self.metric), "values": [] if emb_idx == -1 else x[emb_idx], "metadata": {} if meta_idx == -1 else dotdict(x[meta_idx]) }), data))
+        matches = list(map(lambda x: dotdict({ "id": x[0], "score": norm(x[len(x) - 1], self.metric), "values": [] if emb_idx == -1 else x[emb_idx], "metadata": {} if meta_idx == -1 or x[meta_idx] is None else dotdict(x[meta_idx]) }), data))
         return dotdict({ "namespace": namespace, "matches": matches })
         
     def update(self, id, values = None, set_metadata = None, namespace = ''):
@@ -160,7 +183,7 @@ class Index():
             client.drop()
         with self._connect() as conn:
             with conn.cursor() as cur:
-                cur.execute("DROP TABLE {table_name} CASCADE".format(table_name=self.namespace_table_name))
+                cur.execute("DROP TABLE IF EXISTS {table_name} CASCADE".format(table_name=self.namespace_table_name))
                 query, params = translate_to_pyformat("DELETE FROM {table_name} WHERE name=$1".format(table_name=indexes_table_name), (self.name, ))
                 cur.execute(query, params)
 
@@ -192,7 +215,7 @@ def connect(db_url):
     finally:
             global_pool.putconn(conn)
         
-def create_index(name, dimension, metric):
+def create_index(name, dimension, metric, init_index=True, m: Optional[int] = 12, ef: Optional[int] = 64, ef_construction: Optional[int] = 64):
     namespace_table_name = QueryBuilder._quote_ident(f"{name}_namespaces")
     conn = global_pool.getconn()
     try:
@@ -204,8 +227,9 @@ def create_index(name, dimension, metric):
         conn.commit()
     finally:
             global_pool.putconn(conn)
-    index = Index(pool=global_pool, index_name=name, dimensions=dimension, metric=metric)
-    index._init_index()
+    index = Index(pool=global_pool, index_name=name, dimensions=dimension, metric=metric, m=m, ef=ef, ef_construction=ef_construction)
+    if init_index:
+        index._init_index()
     return index
 
 def delete_index(name):
@@ -226,3 +250,96 @@ def describe_index(index_name: str):
     return Index(pool=global_pool, index_name=index_name).describe()
     
 
+# Get all data from pynecone
+def _get_ids_from_query(index, input_vector, namespace=""):
+    results = index.query(vector=input_vector,
+                          top_k=10000, include_values=False, namespace=namespace)
+    ids = set()
+    for result in results['matches']:
+        ids.add(result['id'])
+    return ids
+
+
+def _get_all_ids_from_index(index, num_vectors, num_dimensions, namespace=""):
+    import numpy as np
+    all_ids = set()
+    while len(all_ids) < num_vectors:
+        input_vector = np.random.rand(num_dimensions).tolist()
+        ids = _get_ids_from_query(index, input_vector, namespace)
+        all_ids.update(ids)
+    return all_ids
+
+def _create_using_pinecone_index(lantern_index, pinecone_index, pinecone_index_info, pinecone_namespaces):
+    for namespace in pinecone_namespaces:
+        num_vectors = pinecone_namespaces[namespace]['vector_count']
+        all_ids = _get_all_ids_from_index(pinecone_index, num_vectors=num_vectors, num_dimensions=int(pinecone_index_info.dimension), namespace=namespace)
+        for chunk in tqdm(chunks(all_ids, 1000), write_bytes=False, bar_format="{percentage:3.0f}%"):
+            data = pinecone_index.fetch(list(chunk), namespace)
+            lantern_index.upsert(vectors=data.vectors.values(), copy=True, namespace=namespace)
+        print(f"Namepsace {namespace} copied")
+
+def _create_using_pinecone_ids(lantern_index, pinecone_index, ids, namespace, pbar):
+    for chunk in chunks(ids, 1000):
+        data = pinecone_index.fetch(list(chunk), namespace)
+        values = data.vectors.values()
+
+        if len(values) == 0:
+            continue
+   
+        lantern_index.upsert(vectors=values, copy=True, namespace=namespace)
+        pbar.update(len(values))
+        
+def _create_using_pinecone_ids_parallel(lantern_index, pinecone_index, ids, num_vectors, namespace):
+    threads = []
+    cpu_count = os.cpu_count() or 1
+    chunk_per_thread = math.ceil(len(ids) / cpu_count)
+    thread_chunks = chunks(ids, chunk_per_thread)
+    pbar = tqdm(total=min(num_vectors, len(ids)))
+
+    for chunk in thread_chunks:
+        thread = threading.Thread(target=_create_using_pinecone_ids, args=(lantern_index, pinecone_index, chunk, namespace, pbar))
+        thread.start()
+        threads.append(thread)
+
+    for thread in threads:
+        thread.join()
+
+def create_from_pinecone(api_key: str, environment: str, index_name: str, namespace: Optional[str] = "", pinecone_ids: Optional[List[str]] =[], recreate=False, m: Optional[int] = 12, ef: Optional[int] = 64, ef_construction: Optional[int] = 64):
+    pinecone.init(api_key=api_key, environment=environment)
+    pinecone_index = pinecone.Index(index_name)
+
+    if recreate:
+        try:
+            delete_index(index_name)
+        except Exception as e:
+            if "does not exist" in str(e):
+                pass
+            else:
+                raise(e)
+            
+
+    index_stats_response = pinecone_index.describe_index_stats()
+    index_info = pinecone.describe_index(index_name)
+
+    supported_metrics = ["euclidean", "cosine", "hamming"]
+
+    if index_info.metric not in supported_metrics:
+        raise(Exception(f"Metric {index_info.metric} is not supported"))
+
+    if not index_info.status or not index_info.status['ready']:
+        raise(Exception(f"Index is not ready"))
+        
+
+    lantern_index = create_index(index_name, int(index_info.dimension), index_info.metric, init_index=False, m=m, ef=ef, ef_construction=ef_construction)
+    lantern_index._init_index_tables()
+
+    print("Copying data...")
+    if not pinecone_ids or len(pinecone_ids) == 0:
+        _create_using_pinecone_index(lantern_index, pinecone_index, index_info, index_stats_response.namespaces)
+    else:
+        _create_using_pinecone_ids_parallel(lantern_index, pinecone_index, pinecone_ids, index_stats_response.namespaces[namespace]['vector_count'], namespace)
+
+    print("Creating index...")
+    lantern_index._init_index_indices()
+    return lantern_index
+    

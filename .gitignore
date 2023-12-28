@@ -1,2 +1,7 @@
 __pycache__
 .ipynb_checkpoints
+.venv
+.DS_Store
+dist
+build
+*.egg-info

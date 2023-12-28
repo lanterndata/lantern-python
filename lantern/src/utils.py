@@ -1,5 +1,6 @@
 import psycopg2
 import re
+import itertools
 
 def default_max_db_connections(db_url):
     conn = psycopg2.connect(dsn=db_url)
@@ -59,9 +60,6 @@ class dotdict(dict):
     __getattr__ = dict.get
     __setattr__ = dict.__setitem__
     __delattr__ = dict.__delitem__
-
-# Upload the sample data formatted as (id, vector) tuples.
-import itertools
 
 def chunks(iterable, batch_size=100):
     it = iter(iterable)

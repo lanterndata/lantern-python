@@ -1,11 +1,11 @@
 import json
-from io import StringIO
-from typing import (List, Optional, Union, Dict, Tuple, Any)
 import numpy as np
 import psycopg2.pool
+from io import StringIO
+from typing import (List, Optional, Union, Dict, Tuple, Any)
 from psycopg2.extras import execute_values 
 from contextlib import contextmanager
-from utils import default_max_db_connections, get_select_fields, translate_to_pyformat
+from .utils import default_max_db_connections, get_select_fields, translate_to_pyformat
 
 class HNSWIndex():
     def __init__(self, dim: Optional[int] = None, m: Optional[int] = None, ef_construction: Optional[int] = None, ef_search: Optional[int] = None) -> None:
@@ -44,22 +44,37 @@ class HNSWIndex():
         return "CREATE INDEX {index_name} ON {table_name} USING hnsw ({column_name} {op_class}) {with_clause};"\
             .format(index_name=index_name_quoted, table_name=table_name_quoted, column_name=column_name_quoted, op_class=op_class, with_clause=with_clause)
 
+
+
 class QueryBuilder:
     def __init__(
             self,
             table_name: str,
             num_dimensions: int,
             id_type: str,
-            distance_type: str
+            distance_type: str,
+            pgvectorcompat: bool
             ) -> None:
         self.table_name = table_name
         self.num_dimensions = num_dimensions
-        self.distance_operator = '<->'
+        self.pgvectorcompat = pgvectorcompat
         self.distance_type = distance_type 
+        self.distance_operator = self._get_distance_operator()
         self.id_type = id_type.lower()
 
     def row_exists_query(self):
         return "SELECT 1 FROM {table_name} LIMIT 1".format(table_name=self._quote_ident(self.table_name))
+
+    def _get_distance_operator(self):
+        if not self.pgvectorcompat:
+            return "<?>"
+        
+        if self.distance_type == 'euclidean':
+            return "<->"
+        elif self.distance_type == 'cosine':
+            return "<=>"
+        elif self.distance_type == 'hamming':
+            return "<#>"
 
     def _get_distance_function(self, a, b):
         if self.distance_type == 'euclidean':
@@ -84,14 +99,13 @@ class QueryBuilder:
                 CREATE EXTENSION IF NOT EXISTS lantern;
                 CREATE TABLE IF NOT EXISTS {table_name} (
                     id {id_type} PRIMARY KEY,
-                    metadata JSONB,
-                    embedding REAL[{dimensions}]
+                    metadata JSONB NOT NULL DEFAULT '{{}}'::jsonb,
+                    embedding REAL[{dimensions}] NOT NULL
                 );
-                CREATE INDEX IF NOT EXISTS {index_name} ON {table_name} USING GIN(metadata jsonb_path_ops);
+                
         '''.format(
             table_name=self._quote_ident(self.table_name), 
             id_type=self.id_type, 
-            index_name=self._quote_ident(self.table_name+"_meta_idx"), 
             dimensions=self.num_dimensions,
         )
 
@@ -133,6 +147,10 @@ class QueryBuilder:
         column_name = "embedding"
         index_name = self._get_embedding_index_name()
         return index.create_index_query(self._quote_ident(self.table_name), self._quote_ident(column_name), index_name, self.distance_type)
+
+    def create_metadata_index_query(self):
+        return "CREATE INDEX IF NOT EXISTS {index_name} ON {table_name} USING GIN(metadata jsonb_path_ops);".format(table_name=self._quote_ident(self.table_name), index_name=self._quote_ident(self.table_name + "_meta_idx"))
+
 
     def _where_clause_for_metadata(self, params: List, filter: Dict[str, Union[str,Dict[str, str]]]):
         has_predicate = False
@@ -210,6 +228,7 @@ class QueryBuilder:
                 distance=distance)
         else:
             distance = "-1.0"
+            distance_query = distance
             order_by_clause = ""
 
 
@@ -236,7 +255,7 @@ class QueryBuilder:
         return (query, params)
 
     def delete_table_query(self):
-        return 'DROP TABLE {table_name} CASCADE'.format(table_name=self._quote_ident(self.table_name))
+        return 'DROP TABLE IF EXISTS {table_name} CASCADE'.format(table_name=self._quote_ident(self.table_name))
 
 
         
@@ -249,15 +268,23 @@ class SyncClient:
             pool: Optional[psycopg2.pool.SimpleConnectionPool] = None,
             distance_type: str = 'cosine',
             max_db_connections: Optional[int] = None,
-            id_type: str = "TEXT",
+            id_type: Optional[str] = "TEXT",
+            pgvectorcompat: Optional[bool] = True,
+            m: Optional[int] = 12,
+            ef: Optional[int] = 64,
+            ef_construction: Optional[int] = 64
             ) -> None:
         self.builder = QueryBuilder(
-            table_name, dimensions, id_type, distance_type)
+            table_name, dimensions, id_type, distance_type, pgvectorcompat)
         self.db_url = url
         self.pool = pool
         self.dimensions = dimensions
         self.table_name = table_name
         self.max_db_connections = max_db_connections
+        self.pgvectorcompat = pgvectorcompat
+        self.m = m
+        self.ef = ef
+        self.ef_construction = ef_construction
 
 
     @contextmanager
@@ -297,11 +324,13 @@ class SyncClient:
                 cur.execute(query)
 
     def create_index(self):
-        hnsw_index = HNSWIndex(dim=self.dimensions)
-        query = self.builder.create_embedding_index_query(hnsw_index)
+        hnsw_index = HNSWIndex(dim=self.dimensions, m=self.m, ef_construction=self.ef_construction, ef_search=self.ef)
+        hnsw_query = self.builder.create_embedding_index_query(hnsw_index)
+        meta_query = self.builder.create_metadata_index_query()
         with self.connect() as conn:
             with conn.cursor() as cur:
-                cur.execute(query)
+                cur.execute(hnsw_query)
+                cur.execute(meta_query)
 
     def upsert(self, data):
         query = self.builder.get_upsert_query()
@@ -380,7 +409,9 @@ class SyncClient:
         with self.connect() as conn:
             with conn.cursor() as cur:
                 cur.execute(f"SET hnsw.init_k={limit}")
-                cur.execute(f"SET enable_seqscan=OFF")
+                cur.execute("SET enable_seqscan=OFF")
+                if not self.pgvectorcompat:
+                  cur.execute(f"SET lantern.pgvectorcompat=OFF")
                 cur.execute(query, params)
                 return cur.fetchall()
 
