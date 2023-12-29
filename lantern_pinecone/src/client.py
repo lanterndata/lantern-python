@@ -19,7 +19,7 @@ class IndexStatusReady():
         self.status = { "ready": True }
 
 class Index():
-    def __init__(self, index_name: str, pool=None, dimensions: int = 3, metric: str = "euclidean", m: Optional[int] = 12, ef: Optional[int] = 64, ef_construction: Optional[int] = 64) -> None:
+    def __init__(self, index_name: str, ef=None, pool=None) -> None:
         self.pool = pool or global_pool
         self.name = index_name
         self.namespace_clients = {}
@@ -31,9 +31,12 @@ class Index():
         
         self.dimensions = info['dimensions']
         self.metric = info['metric']
+        self.m = info['m']
+        self.ef = ef or info['ef']
+        self.ef_construction = info['ef_construction']
         for namespace in self._get_namespaces():
             table_name = self.name if namespace == "" else f"{self.name}_{namespace}"
-            self.namespace_clients[namespace] = SyncClient(pool=self.pool, table_name=table_name, dimensions=dimensions, distance_type=metric, m=m, ef=ef, ef_construction=ef_construction)
+            self.namespace_clients[namespace] = SyncClient(pool=self.pool, table_name=table_name, dimensions=self.dimensions, distance_type=self.metric, m=self.m, ef=self.ef, ef_construction=self.ef_construction)
 
     @contextmanager
     def _connect(self):
@@ -50,14 +53,14 @@ class Index():
     def _get_index_info(self):
         with self._connect() as conn:
             with conn.cursor() as cur:
-                query, params = translate_to_pyformat("SELECT metric, dim FROM {table_name} WHERE name=$1 LIMIT 1".format(table_name=indexes_table_name), (self.name, ))
+                query, params = translate_to_pyformat("SELECT metric, dim, m, ef, ef_construction FROM {table_name} WHERE name=$1 LIMIT 1".format(table_name=indexes_table_name), (self.name, ))
                 cur.execute(query, params)
                 rows = cur.fetchall()
                 if len(rows) == 0:
                     return None
 
                 row = rows[0]
-                return {"metric": row[0], "dimensions": row[1]}
+                return {"metric": row[0], "dimensions": row[1], "m": row[2], "ef": row[3], "ef_construction": row[4] }
         
     def _add_namespace(self, namespace):
         client = SyncClient(pool=self.pool, table_name=f"{self.name}_{namespace}", dimensions=self.dimensions, distance_type=self.metric)
@@ -122,12 +125,12 @@ class Index():
             if type(vec) is not list:
                 vec = list(vec)
 
-            values.append((id, json.dumps(metadata), vec))
+            values.append((id, vec, json.dumps(metadata)))
 
         if copy:
             self._get_client(namespace).bulk_insert(values)
         else:
-            self._get_client(namespace).upsert(values)
+            self._get_client(namespace).upsert_many(values)
         return len(values)
 
     def delete(self, ids, namespace = ''):
@@ -137,29 +140,21 @@ class Index():
         results = self._get_client(namespace).get_by_ids(ids, ['id', 'metadata', 'embedding'])
         vectors = {}
 
-        for data in results:
-            id = data[0]
-            metadata = data[1]
-            values = data[2]
-            vectors[id] = { "id": id, "metadata": metadata or {}, "values": values }
+        for vector in results:
+            vectors[vector.id] = vector
            
         return { "namespace": namespace, "vectors": vectors }
 
     def query(self, vector=None, top_k=10, namespace = '', include_values=False, include_metadata=False, id=None, filter=None):
         select_fields = ['id']
-        meta_idx = -1
-        emb_idx = -1
 
         if include_values:
-            select_fields.append('embedding')
-            emb_idx = 1
-            
+            select_fields.append("embedding")
         if include_metadata:
-            select_fields.append('metadata')
-            meta_idx = select_fields.index('metadata')
-        
+            select_fields.append("metadata")
+
         data = self._get_client(namespace).search(id, vector, top_k, filter, select_fields)
-        matches = list(map(lambda x: dotdict({ "id": x[0], "score": norm(x[len(x) - 1], self.metric), "values": [] if emb_idx == -1 else x[emb_idx], "metadata": {} if meta_idx == -1 or x[meta_idx] is None else dotdict(x[meta_idx]) }), data))
+        matches = list(map(lambda x: dotdict({ "id": x.id, "score": norm(x.distance, self.metric), "values": x.embedding, "metadata": x.metadata }), data))
         return dotdict({ "namespace": namespace, "matches": matches })
         
     def update(self, id, values = None, set_metadata = None, namespace = ''):
@@ -210,7 +205,7 @@ def connect(db_url):
     conn = global_pool.getconn()
     try:
         with conn.cursor() as cur:
-            cur.execute("CREATE TABLE IF NOT EXISTS {table_name} (id SERIAL PRIMARY KEY, name TEXT, metric TEXT, dim INT)".format(table_name=indexes_table_name))
+            cur.execute("CREATE TABLE IF NOT EXISTS {table_name} (id SERIAL PRIMARY KEY, name TEXT, metric TEXT, dim INT, m INT, ef INT, ef_construction INT)".format(table_name=indexes_table_name))
         conn.commit()
     finally:
             global_pool.putconn(conn)
@@ -222,12 +217,12 @@ def create_index(name, dimension, metric, init_index=True, m: Optional[int] = 12
         with conn.cursor() as cur:
             cur.execute("CREATE TABLE IF NOT EXISTS {table_name} (id SERIAL PRIMARY KEY, name TEXT UNIQUE)".format(table_name=namespace_table_name))
             cur.execute("INSERT INTO {table_name} (name) VALUES ('')".format(table_name=namespace_table_name))
-            query, params = translate_to_pyformat("INSERT INTO {table_name} (name, metric, dim) VALUES ($1,$2,$3)".format(table_name=indexes_table_name),(name, metric, dimension))
+            query, params = translate_to_pyformat("INSERT INTO {table_name} (name, metric, dim, m, ef, ef_construction) VALUES ($1,$2,$3,$4,$5,$6)".format(table_name=indexes_table_name),(name, metric, dimension, m, ef, ef_construction))
             cur.execute(query, params)
         conn.commit()
     finally:
             global_pool.putconn(conn)
-    index = Index(pool=global_pool, index_name=name, dimensions=dimension, metric=metric, m=m, ef=ef, ef_construction=ef_construction)
+    index = Index(pool=global_pool, index_name=name)
     if init_index:
         index._init_index()
     return index

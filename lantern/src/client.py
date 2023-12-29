@@ -5,7 +5,7 @@ from io import StringIO
 from typing import (List, Optional, Union, Dict, Tuple, Any)
 from psycopg2.extras import execute_values 
 from contextlib import contextmanager
-from .utils import default_max_db_connections, get_select_fields, translate_to_pyformat
+from .utils import get_vector_result, prepare_insert_data, default_max_db_connections, get_select_fields, translate_to_pyformat
 
 class HNSWIndex():
     def __init__(self, dim: Optional[int] = None, m: Optional[int] = None, ef_construction: Optional[int] = None, ef_search: Optional[int] = None) -> None:
@@ -58,13 +58,23 @@ class QueryBuilder:
         self.table_name = table_name
         self.num_dimensions = num_dimensions
         self.pgvectorcompat = pgvectorcompat
-        self.distance_type = distance_type 
+        self.distance_type = self._parse_distance_type(distance_type)
         self.distance_operator = self._get_distance_operator()
         self.id_type = id_type.lower()
 
     def row_exists_query(self):
         return "SELECT 1 FROM {table_name} LIMIT 1".format(table_name=self._quote_ident(self.table_name))
 
+    def _parse_distance_type(self, distance_type):
+        if distance_type == 'euclidean' or distance_type == "l2sq":
+            return 'euclidean'
+        elif distance_type == 'cosine' or distance_type == "cos":
+            return 'cosine'
+        elif distance_type == 'hamming':
+            return 'hamming'
+
+        raise(Exception(f"Invalid distance type {distance_type}"))
+ 
     def _get_distance_operator(self):
         if not self.pgvectorcompat:
             return "<?>"
@@ -89,7 +99,7 @@ class QueryBuilder:
         return '"{}"'.format(ident.replace('"', '""'))
 
     def get_upsert_query(self):
-        return "INSERT INTO {table_name} (id, metadata, embedding) VALUES %s ON CONFLICT DO NOTHING".format(table_name=self._quote_ident(self.table_name))
+        return "INSERT INTO {table_name} (id, embedding, metadata) VALUES %s ON CONFLICT DO NOTHING".format(table_name=self._quote_ident(self.table_name))
 
     def get_count_query(self):
         return "SELECT COUNT(*) as cnt FROM {table_name}".format(table_name=self._quote_ident(self.table_name))
@@ -258,6 +268,7 @@ class QueryBuilder:
         return 'DROP TABLE IF EXISTS {table_name} CASCADE'.format(table_name=self._quote_ident(self.table_name))
 
 
+
         
 class SyncClient:
     def __init__(
@@ -268,8 +279,8 @@ class SyncClient:
             pool: Optional[psycopg2.pool.SimpleConnectionPool] = None,
             distance_type: str = 'cosine',
             max_db_connections: Optional[int] = None,
-            id_type: Optional[str] = "TEXT",
-            pgvectorcompat: Optional[bool] = True,
+            id_type: str = "TEXT",
+            pgvectorcompat: bool = True,
             m: Optional[int] = 12,
             ef: Optional[int] = 64,
             ef_construction: Optional[int] = 64
@@ -333,18 +344,41 @@ class SyncClient:
                 cur.execute(meta_query)
 
     def upsert(self, data):
+        if data is None or len(data) == 0:
+            raise(Exception("Data can not be empty"))
+
         query = self.builder.get_upsert_query()
+        
+        values = prepare_insert_data(data)
+
         with self.connect() as conn:
             with conn.cursor() as cur:
-                return execute_values(cur, query, data)
+                return execute_values(cur, query, (values,))
+    
+    def upsert_many(self, data):
+        if data is None or len(data) == 0:
+            raise(Exception("Data can not be empty"))
+
+        query = self.builder.get_upsert_query()
+        
+        values = list(map(prepare_insert_data, data))
+
+        with self.connect() as conn:
+            with conn.cursor() as cur:
+                return execute_values(cur, query, values)
 
     def bulk_insert(self, rows):
         f = StringIO("")
         rows_len = len(rows)
         for i in range(len(rows)):
-            data = rows[i]
-            metadata = data[1].replace('\\', '\\\\').replace('"', '\\"')
-            f.write(f"{data[0]}\t{metadata}\t{{{str(data[2])[1:-1]}}}")
+            data = prepare_insert_data(rows[i])
+
+            id = data[0]
+            embedding = data[1]
+            metadata = data[2]
+
+            metadata = metadata.replace('\\', '\\\\').replace('"', '\\"')
+            f.write(f"{id}\t{metadata}\t{{{str(embedding)[1:-1]}}}")
             if i != rows_len - 1:
                 f.write('\n')
         f.seek(0)
@@ -357,8 +391,12 @@ class SyncClient:
         query = self.builder.get_update_by_id_query(embedding, metadata)
         with self.connect() as conn:
             with conn.cursor() as cur:
-                values = list(filter(lambda x: x is not None, [id, embedding, metadata]))
-                cur.execute(query, values)
+                if metadata is not None:
+                    metadata = json.dumps(metadata)
+
+                params = tuple(filter(lambda x: x is not None, [id, embedding, metadata]))
+                query, params = translate_to_pyformat(query, params)
+                cur.execute(query, params)
                 
     def delete_by_ids(self, ids):
         query, params = self.builder.delete_by_ids_query(ids)
@@ -379,7 +417,7 @@ class SyncClient:
         with self.connect() as conn:
             with conn.cursor() as cur:
                 cur.execute(query, id)
-                return cur.fetchall()
+                return get_vector_result(cur.fetchall(), select_fields, True)
     
     def get_by_ids(self, ids=[], select_fields=[]):
         query, params = self.builder.get_by_ids_query(get_select_fields(select_fields), ids)
@@ -387,7 +425,7 @@ class SyncClient:
         with self.connect() as conn:
             with conn.cursor() as cur:
                 cur.execute(query, params)
-                return cur.fetchall()
+                return get_vector_result(cur.fetchall(), select_fields)
     
     def count(self):
         query = self.builder.get_count_query()
@@ -396,13 +434,15 @@ class SyncClient:
                 cur.execute(query)
                 return cur.fetchall()[0][0]
 
-    def search(self, query_id, query_embedding, limit, filter, select_fields = []):
+    def search(self, query_id: Optional[str] = None, query_embedding: Optional[List[float|int]] = None, limit: Optional[int] = 10, filter: Optional[dict] = None, select_fields: Optional[List[str]] = []):
+        if not query_id and not query_embedding:
+            raise(Exception("Please provide 'query_id' or 'query_embedding' argument for search"))
         if query_id:
-            query_embedding = self.get_by_id([query_id], ['embedding'])
-            if len(query_embedding) == 0:
+            row = self.get_by_id([query_id], ['embedding'])
+            if row is None:
                 return []
             else:
-                query_embedding = query_embedding[0]
+                query_embedding = row.embedding
   
         query, params = self.builder.search_query(query_embedding, limit=limit, filter=filter, select=select_fields)
         query, params = translate_to_pyformat(query, params)
@@ -413,5 +453,5 @@ class SyncClient:
                 if not self.pgvectorcompat:
                   cur.execute(f"SET lantern.pgvectorcompat=OFF")
                 cur.execute(query, params)
-                return cur.fetchall()
+                return get_vector_result(cur.fetchall(), select_fields)
 

@@ -1,6 +1,7 @@
 import psycopg2
 import re
 import itertools
+import json
 
 def default_max_db_connections(db_url):
     conn = psycopg2.connect(dsn=db_url)
@@ -67,3 +68,57 @@ def chunks(iterable, batch_size=100):
     while chunk:
         yield chunk
         chunk = tuple(itertools.islice(it, batch_size))
+
+def index_of(l, s):
+     try:
+        return l.index(s)
+     except ValueError:
+        return -1
+
+def get_vector_result(rows=[], select_fields=[], first=False):
+    id_idx = -1
+    embedding_idx = -1
+    metadata_idx = -1
+    
+    if len(rows) == 0:
+        return []
+
+    if len(select_fields) == 0:
+        id_idx = 0
+        metadata_idx = 1
+        embedding_idx = 2
+    else:
+        id_idx = index_of(select_fields, "id")
+        embedding_idx = index_of(select_fields, "embedding")
+        metadata_idx = index_of(select_fields, "metadata")
+    
+    results = []
+
+    for data in rows:
+        result_vec = { "id": None, "embedding": None, "metadata": None, "distance": -1 }
+
+        if id_idx > -1:
+            result_vec["id"] = data[id_idx]
+        if embedding_idx > -1:
+            result_vec["embedding"] = data[embedding_idx]
+        if metadata_idx > -1:
+            result_vec["metadata"] = None if data[metadata_idx] is None else dotdict(data[metadata_idx])
+
+        result_vec["distance"] = data[len(data) - 1]
+
+        results.append(dotdict(result_vec))
+
+    if first:
+        return None if len(results) == 0 else results[0]
+
+    return results
+
+def prepare_insert_data(row):
+    id = row[0]
+    vec = row[1]
+    metadata = 'null' if len(row) < 3 else row[2]
+
+    if type(metadata) != str:
+        metadata = json.dumps(metadata)
+
+    return (id, vec, metadata)

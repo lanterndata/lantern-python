@@ -21,8 +21,7 @@ setuptools.setup(
         "License :: OSI Approved :: BSL License",
         "Operating System :: OS Independent",
     ],
-    package_dir = {"": "src"},
-    packages = setuptools.find_packages(where="src"),
+    package_dir = {"lantern_pinecone": "src"},
     python_requires = ">=3.6",
     install_requires= [
       'lantern-client ==0.0.1',
