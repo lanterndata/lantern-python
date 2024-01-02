@@ -299,7 +299,7 @@ def _create_using_pinecone_ids_parallel(lantern_index, pinecone_index, ids, num_
     for thread in threads:
         thread.join()
 
-def create_from_pinecone(api_key: str, environment: str, index_name: str, namespace: Optional[str] = "", pinecone_ids: Optional[List[str]] =[], recreate=False, m: Optional[int] = 12, ef: Optional[int] = 64, ef_construction: Optional[int] = 64):
+def create_from_pinecone(api_key: str, environment: str, index_name: str, namespace: Optional[str] = "", pinecone_ids: Optional[List[str]] =[], recreate=False, create_lantern_index: Optional[bool] = True, m: Optional[int] = 12, ef: Optional[int] = 64, ef_construction: Optional[int] = 64):
     pinecone.init(api_key=api_key, environment=environment)
     pinecone_index = pinecone.Index(index_name)
 
