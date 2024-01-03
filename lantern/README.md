@@ -9,6 +9,8 @@ pip install lantern-client
 ## Basic usage
 
 ```python
+from lantern import SyncClient
+
 DB_URL="postgresql://postgres@localhost:5432/lantern"
 client = SyncClient(url=DB_URL, table_name="small_world", dimensions=3, distance_type="l2sq", m=12, ef=64, ef_construction=64)
 try:
