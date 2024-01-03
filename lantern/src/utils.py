@@ -81,7 +81,7 @@ def get_vector_result(rows=[], select_fields=[], first=False):
     metadata_idx = -1
     
     if len(rows) == 0:
-        return []
+        return [] if not first else None
 
     if len(select_fields) == 0:
         id_idx = 0

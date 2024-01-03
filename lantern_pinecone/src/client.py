@@ -334,7 +334,8 @@ def create_from_pinecone(api_key: str, environment: str, index_name: str, namesp
     else:
         _create_using_pinecone_ids_parallel(lantern_index, pinecone_index, pinecone_ids, index_stats_response.namespaces[namespace]['vector_count'], namespace)
 
-    print("Creating index...")
-    lantern_index._init_index_indices()
+    if create_lantern_index:
+        print("Creating index...")
+        lantern_index._init_index_indices()
     return lantern_index
     

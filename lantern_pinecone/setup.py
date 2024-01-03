@@ -5,7 +5,7 @@ with open("README.md", "r", encoding = "utf-8") as fh:
 
 setuptools.setup(
     name='lantern-pinecone',
-    version='0.0.1',    
+    version='0.0.3',    
     description='Pinecone compatiable client for Lantern',
     url='https://github.com/lanterndata/lantern-python-client',
     author='Varik Matevosyan',
@@ -24,7 +24,7 @@ setuptools.setup(
     package_dir = {"lantern_pinecone": "src"},
     python_requires = ">=3.6",
     install_requires= [
-      'lantern-client ==0.0.1',
+      'lantern-client ==0.0.2',
       'tqdm ==4.66.1',
       'pinecone-client ==2.2.4'
     ]

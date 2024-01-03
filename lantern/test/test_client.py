@@ -9,7 +9,6 @@ if DB_URL is None:
     raise(Exception("Please provide 'DB_URL' env variable"))
 
 def test_client():
-    DB_URL="postgresql://postgres@localhost:5432/lantern"
     client = SyncClient(url=DB_URL, table_name="small_world", dimensions=3, distance_type="l2sq", m=12, ef=64, ef_construction=64)
     try:
       client.drop()

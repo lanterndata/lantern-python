@@ -5,7 +5,7 @@ with open("README.md", "r", encoding = "utf-8") as fh:
 
 setuptools.setup(
     name='lantern-client',
-    version='0.0.1',    
+    version='0.0.2',    
     description='Python client for Lantern',
     url='https://github.com/lanterndata/lantern-python-client',
     author='Varik Matevosyan',
