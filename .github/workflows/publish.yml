@@ -33,10 +33,10 @@ jobs:
       - name: Publish lantern-client package distributions to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          packages-dir: lantern/
+          packages-dir: lantern/dist/
           skip-existing: true
   pypi-publish-lantern-pinecone-client:
-    name: Upload lantern-client to PyPI
+    name: Upload lantern-pinecone to PyPI
     runs-on: ubuntu-latest
     environment:
       name: pypi
@@ -60,5 +60,5 @@ jobs:
       - name: Publish lantern-pinecone package distributions to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          packages-dir: lantern_pinecone/
+          packages-dir: lantern_pinecone/dist/
           skip-existing: true
