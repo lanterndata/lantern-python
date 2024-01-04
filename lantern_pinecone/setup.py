@@ -7,14 +7,14 @@ setuptools.setup(
     name='lantern-pinecone',
     version='0.0.3',    
     description='Pinecone compatiable client for Lantern',
-    url='https://github.com/lanterndata/lantern-python-client',
+    url='https://github.com/lanterndata/lantern-python',
     author='Varik Matevosyan',
     author_email='varik@lantern.dev',
     license='BSL 1.1',
     long_description = long_description,
     long_description_content_type = "text/markdown",
     project_urls = {
-        "Bug Tracker": "https://github.com/lanterndata/lantern-python-client/issues",
+        "Bug Tracker": "https://github.com/lanterndata/lantern-python/issues",
     },
     classifiers = [
         "Programming Language :: Python :: 3",
