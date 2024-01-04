@@ -1,0 +1,29 @@
+name: build
+on:
+  workflow_dispatch:
+    inputs:
+      create_release:
+        type: boolean
+        description: "Create GitHub release for current version"
+        required: false
+        default: false
+jobs:
+  pypi-publish:
+    name: Upload lantern-client to PyPI
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/lantern-client
+    permissions:
+      id-token: write
+    steps:
+      - name: Publish lantern-client package distributions to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: lantern/
+          skip-existing: true
+      - name: Publish lantern-pinecone distributions to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: lantern-pinecone/
+          skip-existing: true
