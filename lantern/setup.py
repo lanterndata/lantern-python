@@ -5,7 +5,7 @@ with open("README.md", "r", encoding = "utf-8") as fh:
 
 setuptools.setup(
     name='lantern-client',
-    version='0.0.3',
+    version='0.0.5',
     description='Python client for Lantern',
     url='https://github.com/lanterndata/lantern-python',
     author='Varik Matevosyan',
@@ -25,6 +25,6 @@ setuptools.setup(
     python_requires = ">=3.6",
     install_requires= [
       'psycopg2-binary ==2.9.9',
-      'numpy ==1.26.2'
+      'numpy'
     ]
 )
