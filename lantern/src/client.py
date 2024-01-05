@@ -434,7 +434,7 @@ class SyncClient:
                 cur.execute(query)
                 return cur.fetchall()[0][0]
 
-    def search(self, query_id: Optional[str] = None, query_embedding: Optional[List[float|int]] = None, limit: Optional[int] = 10, filter: Optional[dict] = None, select_fields: Optional[List[str]] = []):
+    def search(self, query_id: Optional[str] = None, query_embedding: Optional[List[Union[float, int]]] = None, limit: Optional[int] = 10, filter: Optional[dict] = None, select_fields: Optional[List[str]] = []):
         if not query_id and not query_embedding:
             raise(Exception("Please provide 'query_id' or 'query_embedding' argument for search"))
         if query_id:
