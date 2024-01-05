@@ -22,7 +22,7 @@ setuptools.setup(
         "Operating System :: OS Independent",
     ],
     package_dir = {"lantern_pinecone": "src"},
-    python_requires = ">=3.6",
+    python_requires = ">=3.8",
     install_requires= [
       'lantern-client ==0.0.5',
       'tqdm ==4.66.1',
