@@ -4,8 +4,8 @@ with open("README.md", "r", encoding = "utf-8") as fh:
     long_description = fh.read()
 
 setuptools.setup(
-    name='lantern-client',
-    version='0.0.3',
+    name='lantern_client',
+    version='0.0.4',
     description='Python client for Lantern',
     url='https://github.com/lanterndata/lantern-python',
     author='Varik Matevosyan',
