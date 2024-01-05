@@ -4,7 +4,7 @@ with open("README.md", "r", encoding = "utf-8") as fh:
     long_description = fh.read()
 
 setuptools.setup(
-    name='lantern_pinecone',
+    name='lantern-pinecone',
     version='0.0.6',
     description='Pinecone compatiable client for Lantern',
     url='https://github.com/lanterndata/lantern-python',
