@@ -37,8 +37,8 @@ def test_client():
 
     # Query the index
     results = index.query(vector=[0, 0, 0], top_k=2, include_values=True)
-    assert (len(results) == 2)
-    assert (results[0]['id'] == "1")
+    assert (len(results['matches']) == 2)
+    assert (results['matches'][0]['id'] == "1")
 
     # Delete the index
     lantern_pinecone.delete_index(index_name)
