@@ -71,7 +71,6 @@ class Index():
                 cur.execute(query, params)
 
         client.create_table()
-        client.create_index()
         self.namespace_clients[namespace] = client
 
         return client
