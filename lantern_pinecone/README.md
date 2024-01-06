@@ -1,4 +1,4 @@
-# Lantern client compatible with Pinecone API
+# Pinecone-API-Compatible Lantern Client
 
 ## Install
 
