@@ -28,7 +28,7 @@ jobs:
           python-version: ${{ matrix.python }}
       - name: Set up database
         run: |
-          DATABASE_NAME=db${{ matrix.python }}
+          DATABASE_NAME=db${{ matrix.python // '.' / '_' }}
           PGPASSWORD=postgres psql -h localhost -U postgres -c "CREATE DATABASE $DATABASE_NAME"
       - name: Install dependencies and run tests
         run: |
@@ -61,7 +61,7 @@ jobs:
           python-version: ${{ matrix.python }}
       - name: Set up database
         run: |
-          DATABASE_NAME=db${{ matrix.python }}
+          DATABASE_NAME=db${{ matrix.python // '.' / '_' }}
           PGPASSWORD=postgres psql -h localhost -U postgres -c "CREATE DATABASE $DATABASE_NAME"
       - name: Install dependencies and run tests
         run: |
