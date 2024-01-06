@@ -33,7 +33,7 @@ def test_client():
 
     # Check index stats
     stats = index.describe_index_stats()
-    assert (stats['count'] == 3)
+    assert (stats['total_count'] == 3)
 
     # Query the index
     results = index.query(vector=[0, 0, 0], top_k=2, include_values=True)
