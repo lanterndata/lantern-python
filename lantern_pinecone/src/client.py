@@ -71,7 +71,6 @@ class Index():
                 cur.execute(query, params)
 
         client.create_table()
-        client.create_index()
         self.namespace_clients[namespace] = client
 
         return client
@@ -271,7 +270,7 @@ def _create_using_pinecone_index(lantern_index, pinecone_index, pinecone_index_i
         for chunk in tqdm(chunks(all_ids, 1000), write_bytes=False, bar_format="{percentage:3.0f}%"):
             data = pinecone_index.fetch(list(chunk), namespace)
             lantern_index.upsert(vectors=data.vectors.values(), copy=True, namespace=namespace)
-        print(f"Namepsace {namespace} copied")
+        print(f"Namespace {namespace} copied")
 
 def _create_using_pinecone_ids(lantern_index, pinecone_index, ids, namespace, pbar):
     for chunk in chunks(ids, 1000):
