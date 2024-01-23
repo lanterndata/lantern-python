@@ -62,3 +62,30 @@ jobs:
         with:
           packages-dir: lantern_pinecone/dist/
           skip-existing: true
+  pypi-publish-lantern-django-client:
+    name: Upload lantern-django to PyPI
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/lantern-django
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.x"
+      - name: Install pypa/build
+        run: >-
+          python3 -m
+          pip install
+          build
+          --user
+      - name: Build a binary wheel and a source tarball
+        run: cd lantern_django && python3 -m build && cd ..
+      - name: Publish lantern-django package distributions to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: lantern_django/dist/
+          skip-existing: true
