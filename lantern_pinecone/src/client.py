@@ -12,7 +12,7 @@ from lantern import QueryBuilder, SyncClient
 from lantern.utils import chunks, default_max_db_connections, dotdict, norm, translate_to_pyformat
 
 global_pool = None
-indexes_table_name = "lantern_indexes"
+indexes_table_name = "lantern_index_metadata"
 
 class IndexStatusReady():
     def __init__(self ):
@@ -23,7 +23,7 @@ class Index():
         self.pool = pool or global_pool
         self.name = index_name
         self.namespace_clients = {}
-        self.namespace_table_name = QueryBuilder._quote_ident(f"{self.name}_namespaces")
+        self.namespace_table_name = QueryBuilder._quote_ident(f"{self.name}_pinecone_namespaces")
 
         info = self._get_index_info()
         if info is None:
@@ -191,15 +191,63 @@ class GRPCIndex(Index):
                 self.upsert(chunk, namespace=namespace)
     pass
 # Exported functions
-def init(url: str):
-    connect(url)
+def init(url: Optional[str] = None, **kwargs):
+    """
+    Create a new connection.
+
+    The connection parameters can be specified as a string:
+
+        lantern_pinecone.init("host=localhost dbname=test user=postgres password=secret")
+
+    or using a set of keyword arguments:
+
+        lantern_pinecone.init(host="localhost", database="test", user="postgres", password="secret")
+
+    or using a postgres connection URL:
+
+        lantern_pinecone.init("postgres:://postgres:secret@localhost:port/test")
+
+    Or as a mix of both. The basic connection parameters are:
+
+    - *dbname*: the database name
+    - *database*: the database name (only as keyword argument)
+    - *user*: user name used to authenticate
+    - *password*: password used to authenticate
+    - *host*: database host address (defaults to UNIX socket if not provided)
+    - *port*: connection port number (defaults to 5432 if not provided)
+    """
+    connect(url, **kwargs)
     
-def connect(db_url):
+def connect(db_url=None, **kwargs):
+    """
+    Create a new connection.
+
+    The connection parameters can be specified as a string:
+
+        lantern_pinecone.init("host=localhost dbname=test user=postgres password=secret")
+
+    or using a set of keyword arguments:
+
+        lantern_pinecone.init(host="localhost", database="test", user="postgres", password="secret")
+
+    or using a postgres connection URL:
+
+        lantern_pinecone.init("postgres:://postgres:secret@localhost:port/test")
+
+    Or as a mix of both. The basic connection parameters are:
+
+    - *dbname*: the database name
+    - *database*: the database name (only as keyword argument)
+    - *user*: user name used to authenticate
+    - *password*: password used to authenticate
+    - *host*: database host address (defaults to UNIX socket if not provided)
+    - *port*: connection port number (defaults to 5432 if not provided)
+    """
     global global_pool
-    max_db_connections = default_max_db_connections(db_url)
+    max_db_connections = default_max_db_connections(db_url, **kwargs)
 
     global_pool = psycopg2.pool.SimpleConnectionPool(
-        1, max_db_connections, dsn=db_url)
+        1, max_db_connections, dsn=db_url, **kwargs)
     
     conn = global_pool.getconn()
     try:
@@ -210,11 +258,16 @@ def connect(db_url):
             global_pool.putconn(conn)
         
 def create_index(name, dimension, metric, init_index=True, m: Optional[int] = 12, ef: Optional[int] = 64, ef_construction: Optional[int] = 64):
-    namespace_table_name = QueryBuilder._quote_ident(f"{name}_namespaces")
+    namespace_table_name = QueryBuilder._quote_ident(f"{name}_pinecone_namespaces")
     conn = global_pool.getconn()
     try:
         with conn.cursor() as cur:
-            cur.execute("CREATE TABLE IF NOT EXISTS {table_name} (id SERIAL PRIMARY KEY, name TEXT UNIQUE)".format(table_name=namespace_table_name))
+            try:
+                cur.execute("CREATE TABLE {table_name} (id SERIAL PRIMARY KEY, name TEXT UNIQUE)".format(table_name=namespace_table_name))
+            except Exception as e:
+                raise(Exception("Unable to create Lantern table {table_name} from a pinecone collection. Does the table already exist? error: {e}".format(table_name=namespace_table_name, e=e)))
+
+
             cur.execute("INSERT INTO {table_name} (name) VALUES ('')".format(table_name=namespace_table_name))
             query, params = translate_to_pyformat("INSERT INTO {table_name} (name, metric, dim, m, ef, ef_construction) VALUES ($1,$2,$3,$4,$5,$6)".format(table_name=indexes_table_name),(name, metric, dimension, m, ef, ef_construction))
             cur.execute(query, params)
