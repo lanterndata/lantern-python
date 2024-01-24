@@ -15,7 +15,7 @@ jobs:
         python: ['3.12', '3.11', '3.10', '3.9', '3.8', '3.7']
     services:
       postgres:
-        image: lanterndata/lantern:latest-pg15
+        image: lanterndata/lantern-suite:latest-pg15
         env:
           POSTGRES_PASSWORD: postgres
         ports:
@@ -48,7 +48,7 @@ jobs:
         python: ['3.12', '3.11', '3.10', '3.9', '3.8']
     services:
       postgres:
-        image: lanterndata/lantern:latest-pg15
+        image: lanterndata/lantern-suite:latest-pg15
         env:
           POSTGRES_PASSWORD: postgres
         ports:
@@ -82,7 +82,7 @@ jobs:
         python: ['3.12', '3.11', '3.10', '3.9', '3.8', '3.7']
     services:
       postgres:
-        image: lanterndata/lantern:latest-pg15
+        image: lanterndata/lantern-suite:latest-pg15
         env:
           POSTGRES_PASSWORD: postgres
         ports:
