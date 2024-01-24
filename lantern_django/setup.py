@@ -22,7 +22,7 @@ setuptools.setup(
         "Operating System :: OS Independent",
     ],
     package_dir={"lantern_django": "src"},
-    python_requires=">=3.8",
+    python_requires=">=3.7",
     install_requires=[
         'django',
         'numpy'
