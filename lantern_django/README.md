@@ -8,19 +8,6 @@ pip install lantern-django
 
 ## Basic usage
 
-Create a migration to enable the extensions:
-
-```python
-from django.db import migrations
-from lantern_django import LanternExtension, LanternExtrasExtension
-
-class Migration(migrations.Migration):
-    operations = [
-        LanternExtension(),
-        LanternExtrasExtension(),
-    ]
-```
-
 Add a `REAL[]` field to your model
 
 ```python
