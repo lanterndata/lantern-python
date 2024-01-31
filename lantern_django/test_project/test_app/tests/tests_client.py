@@ -73,13 +73,13 @@ class TestDjangoLantern(TestCase):
                     obj.save()
 
     def test_clean(self):
-        item = Item(id=1, embedding=[1, 2, 3] + [0] * 381)
+        item = Item(id=1, embedding=[1, 2, 3] + [0] * 381, title='test', country='US', state='CA', city='San Francisco', company_name='Google')
         item.full_clean()
 
     def test_get_or_create(self):
-        Item.objects.get_or_create(embedding=[1, 2, 3] + [0] * 381)
+        Item.objects.get_or_create(embedding=[1, 2, 3] + [0] * 381, title='test', country='US', state='CA', city='San Francisco', company_name='Google')
 
     def test_missing(self):
-        Item().save()
+        Item(title='test', country='US', state='CA', city='San Francisco', company_name='Google').save()
         assert Item.objects.first().embedding is None
 
