@@ -13,7 +13,7 @@ def create_items():
         [1, 1, 2]
     ]
     for i, v in enumerate(vectors):
-        item = Item(id=i + 1, embedding=v + [0] * 381)
+        item = Item(id=i + 1, embedding=v + [0] * 381, title='test', country='US', state='CA', city='San Francisco', company_name='Google')
         item.save()
 
 class TestDjangoLantern(TestCase):
@@ -21,7 +21,7 @@ class TestDjangoLantern(TestCase):
         Item.objects.all().delete()
 
     def test_works(self):
-        item = Item(id=1, embedding=[1, 2, 3] + [0] * 381)
+        item = Item(id=1, embedding=[1, 2, 3] + [0] * 381, title='test', country='US', state='CA', city='San Francisco', company_name='Google')
         item.save()
         item = Item.objects.get(pk=1)
         self.assertEqual(item.id, 1)
