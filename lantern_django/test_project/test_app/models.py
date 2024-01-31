@@ -5,7 +5,12 @@ from lantern_django import HnswIndex, RealField
 
 class Item(models.Model):
     embedding = ArrayField(RealField(), size=3, null=True)
-
+    title = models.CharField(max_length=100, null=True, default="")
+    country = models.CharField(max_length=100, null=True, default="")
+    company_name = models.CharField(max_length=100, null=True, default="")
+    city = models.CharField(max_length=100, null=True, default="")
+    state = models.CharField(max_length=100, null=True, default="")
+    
     class Meta:
         indexes = [
             HnswIndex(

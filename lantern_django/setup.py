@@ -1,4 +1,5 @@
 import setuptools
+from setuptools import find_packages
 
 with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
@@ -21,7 +22,7 @@ setuptools.setup(
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],
-    package_dir={"lantern_django": "src"},
+    packages=find_packages(),
     python_requires=">=3.7",
     install_requires=[
         'django',

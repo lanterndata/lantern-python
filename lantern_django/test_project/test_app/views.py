@@ -9,11 +9,7 @@ from lantern_django import L2Distance, TextEmbedding
 @csrf_exempt
 def index(request):
 
-    results = Item.objects.annotate(distance=L2Distance('embedding', [3, 1, 2]))
+    distance = L2Distance('embedding', TextEmbedding(
+        'BAAI/bge-small-en', 'hello'))
 
-    results_list = [{
-        "title": result.id,
-        "distance": result.distance
-    } for result in results]
-
-    return JsonResponse({"results": results_list})
+    return JsonResponse({"results": distance})

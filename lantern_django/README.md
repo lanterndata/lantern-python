@@ -6,7 +6,20 @@
 pip install lantern-django
 ```
 
+
 ## Basic usage
+
+Install the app on your Django project
+
+```python
+# settings.py
+INSTALLED_APPS = [
+    ...
+    'lantern_django',
+    ...
+]
+```
+
 
 Add a `REAL[]` field to your model
 
@@ -73,3 +86,14 @@ class Item(models.Model):
             )
         ]
 ```
+
+
+### Running the test_project
+
+```sh
+cd lantern_django/test_project
+python manage.py migrate
+python manage.py runserver
+```
+
+Then go to `http://localhost:8000` 
