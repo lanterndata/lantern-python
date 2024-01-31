@@ -106,5 +106,5 @@ jobs:
           python3 -m pip install pytest
           DATABASE_NAME=db_$(echo "${{ matrix.python }}" | tr '.' '_')
           export DB_URL="postgresql://postgres:postgres@localhost:5432/$DATABASE_NAME"
-          cd lantern_django
-          pytest
+          cd lantern_django/test_project
+          python3 manage.py test test_app.tests.TestDjangoLantern
