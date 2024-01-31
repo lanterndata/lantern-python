@@ -29,7 +29,7 @@ from django.contrib.postgres.fields import ArrayField
 from lantern_django import RealField
 
 class Item(models.Model):
-    embedding = ArrayField(RealField(), size=3, null=True)
+    embedding = ArrayField(RealField(), size=384, null=True)
 ```
 
 Insert a vector

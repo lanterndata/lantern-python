@@ -4,7 +4,7 @@ from django.contrib.postgres.fields import ArrayField
 from lantern_django import HnswIndex, RealField
 
 class Item(models.Model):
-    embedding = ArrayField(RealField(), size=3, null=True)
+    embedding = ArrayField(RealField(), size=384, null=True)
 
     class Meta:
         indexes = [
@@ -14,7 +14,7 @@ class Item(models.Model):
                 m=16,
                 ef=64,
                 ef_construction=64,
-                dim=3,
+                dim=384,
                 opclasses=['dist_l2sq_ops']
             )
         ]

@@ -17,7 +17,7 @@ class Migration(migrations.Migration):
             name='Item',
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('embedding', django.contrib.postgres.fields.ArrayField(base_field=lantern_django.RealField(), null=True, size=3)),
+                ('embedding', django.contrib.postgres.fields.ArrayField(base_field=lantern_django.RealField(), null=True, size=384)),
             ],
             options={
                 'indexes': [lantern_django.HnswIndex(dim=384, ef=64, ef_construction=64, fields=['embedding'], m=16, name='hnsw_idx', opclasses=['dist_l2sq_ops'])],
