@@ -7,7 +7,7 @@ from django.contrib.postgres.fields import ArrayField
 from django.db.migrations.loader import MigrationLoader
 import numpy as np
 from lantern_django import LanternExtension, LanternExtrasExtension, HnswIndex, L2Distance, CosineDistance, RealField, TextEmbedding
-from unittest import mock
+from unittest import TestCase, mock
 from models import Item
 
 def create_items():
@@ -20,34 +20,30 @@ def create_items():
         item = Item(id=i + 1, embedding=v + [0] * 381)
         item.save()
 
-
-class TestDjango:
-    def setup_method(self, test_method):
+class TestDjango(TestCase):
+    def setUp(self):
         Item.objects.all().delete()
 
     def test_works(self):
         item = Item(id=1, embedding=[1, 2, 3] + [0] * 381)
         item.save()
         item = Item.objects.get(pk=1)
-        assert item.id == 1
-        assert np.array_equal(np.array(item.embedding),
-                              np.array([1, 2, 3] + [0] * 381))
+        self.assertEqual(item.id, 1)
+        self.assertTrue(np.array_equal(np.array(item.embedding), np.array([1, 2, 3] + [0] * 381)))
 
     def test_l2sq_distance(self):
         create_items()
         distance = L2Distance('embedding', [1, 1, 1] + [0] * 381)
         items = Item.objects.annotate(distance=distance).order_by(distance)
-        assert [v.id for v in items] == [1, 3, 2]
-        assert [v.distance for v in items] == [0, 1, 3]
+        self.assertEqual([v.id for v in items], [1, 3, 2])
+        self.assertEqual([v.distance for v in items], [0, 1, 3])
 
     def test_cosine_distance(self):
         create_items()
         distance = CosineDistance('embedding', [1, 1, 1] + [0] * 381)
         items = Item.objects.annotate(distance=distance).order_by(distance)
-        assert [v.id for v in items] == [1, 2, 3]
-        # assert [v.distance for v in items] == [0, 0, 0.05719095841793653]
-        # TODO: Remove this and uncomment above when double precision supported
-        assert [v.distance for v in items] == [0, 0, 0.057191014]
+        self.assertEqual([v.id for v in items], [1, 2, 3])
+        # self.assertEqual([v.distance for v in items], [0, 0, 0.05719095841793653])
 
     def test_filter(self):
         create_items()
@@ -90,3 +86,4 @@ class TestDjango:
     def test_missing(self):
         Item().save()
         assert Item.objects.first().embedding is None
+
