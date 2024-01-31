@@ -88,12 +88,12 @@ class Item(models.Model):
 ```
 
 
-### Running the test_project
+### Running the test_project and it's tests
 
 ```sh
 cd lantern_django/test_project
 python manage.py migrate
 python manage.py runserver
+python3 manage.py test test_app.tests.TestDjangoLantern
 ```
 
-Then go to `http://localhost:8000` 

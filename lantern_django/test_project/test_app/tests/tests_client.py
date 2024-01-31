@@ -1,14 +1,10 @@
-import os
-import django
-from django.conf import settings
+
 from django.core import serializers
-from django.db import connection, migrations, models
-from django.contrib.postgres.fields import ArrayField
-from django.db.migrations.loader import MigrationLoader
 import numpy as np
-from lantern_django import LanternExtension, LanternExtrasExtension, HnswIndex, L2Distance, CosineDistance, RealField, TextEmbedding
-from unittest import TestCase, mock
-from models import Item
+from lantern_django import L2Distance, CosineDistance, TextEmbedding
+from unittest import mock
+from django.test import TestCase
+from ..models import Item
 
 def create_items():
     vectors = [
@@ -20,7 +16,7 @@ def create_items():
         item = Item(id=i + 1, embedding=v + [0] * 381)
         item.save()
 
-class TestDjango(TestCase):
+class TestDjangoLantern(TestCase):
     def setUp(self):
         Item.objects.all().delete()
 
