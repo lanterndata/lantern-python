@@ -76,3 +76,12 @@ def test_client():
     assert (vectors[0].id == "1")
     assert (vectors[0].metadata is None)
     assert (vectors[0].embedding is None)
+
+    # Search for vectors using the embedding of the vector with ID "4"
+    # Limit the results to 2 and apply an $in filter on the metadata
+    vectors = client.search(query_embedding=vec_by_id.embedding, limit=2, filter={
+                            "name": {"$in": "a"}}, select_fields=["id"])
+    assert (len(vectors) == 1)
+    assert (vectors[0].id == "1")
+    assert (vectors[0].metadata is None)
+    assert (vectors[0].embedding is None)

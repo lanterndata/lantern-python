@@ -135,7 +135,8 @@ class TestDjango:
             'BAAI/bge-small-en', 'hello'))
         results = Item.objects.annotate(distance=distance).order_by('distance')
         assert [v.id for v in results] == [1, 3, 2]
-        assert [v.distance for v in results] == [93.583, 95.45514, 103.85868]
+        assert [v.distance for v in results] == [
+            93.582954, 95.45509, 103.85861]
 
     def test_limit(self):
         create_items()
