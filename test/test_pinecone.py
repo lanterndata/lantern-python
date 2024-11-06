@@ -2,7 +2,7 @@ import os
 import sys
 import lantern_pinecone
 
-sys.path.append('../src')
+sys.path.append("../src")
 
 DB_URL = os.environ.get("DB_URL")
 
@@ -20,26 +20,23 @@ def test_client():
 
     dimensions = 3
     lantern_pinecone.create_index(
-        name=index_name, dimension=dimensions, metric="cosine")
+        name=index_name, dimension=dimensions, metric="cosine"
+    )
     index = lantern_pinecone.Index(index_name=index_name)
 
     # Insert data into the index
-    data = [
-        ("1", [0, 0, 0]),
-        ("2", [0, 1, 0]),
-        ("3", [0, 0, 1])
-    ]
+    data = [("1", [0, 0, 0]), ("2", [0, 1, 0]), ("3", [0, 0, 1])]
     index.upsert(vectors=data)
 
     # Check index stats
     stats = index.describe_index_stats()
-    assert (stats['total_count'] == 3)
+    assert stats["total_count"] == 3
 
     # Query the index
     results = index.query(vector=[0, 1, 0], top_k=2, include_values=True)
-    assert (len(results['matches']) == 2)
-    assert (results['matches'][0]['id'] == "2")
+    assert len(results["matches"]) == 2
+    assert results["matches"][0]["id"] == "2"
 
     # Delete the index
     lantern_pinecone.delete_index(index_name)
-    assert (index_name not in lantern_pinecone.list_indexes())
+    assert index_name not in lantern_pinecone.list_indexes()

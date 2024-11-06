@@ -2,9 +2,11 @@ name: build
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
+      - staging
   pull_request:
-    branches: [ '*' ]
+    types: [opened, synchronize, reopened, ready_for_review]
 
 jobs:
   lantern-client:
@@ -12,10 +14,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python: ['3.12', '3.11', '3.10', '3.9', '3.8', '3.7']
+        python: ['3.13', '3.12', '3.11', '3.10', '3.9', '3.8']
     services:
       postgres:
-        image: lanterndata/lantern-suite:latest-pg15
+        image: lanterndata/lantern-self-hosted:lantern-0.4.1-extras-0.4.1-minor-1
         env:
           POSTGRES_PASSWORD: postgres
         ports:
@@ -38,17 +40,16 @@ jobs:
           python3 -m pip install pytest
           DATABASE_NAME=db_$(echo "${{ matrix.python }}" | tr '.' '_')
           export DB_URL="postgresql://postgres:postgres@localhost:5432/$DATABASE_NAME"
-          cd lantern
-          pytest
+          pytest test/test_lantern.py
   lantern-pinecone:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        python: ['3.12', '3.11', '3.10', '3.9', '3.8']
+        python: ['3.13', '3.12', '3.11', '3.10', '3.9', '3.8']
     services:
       postgres:
-        image: lanterndata/lantern-suite:latest-pg15
+        image: lanterndata/lantern-self-hosted:lantern-0.4.1-extras-0.4.1-minor-1
         env:
           POSTGRES_PASSWORD: postgres
         ports:
@@ -72,17 +73,16 @@ jobs:
           python3 -m pip install pytest
           DATABASE_NAME=db_$(echo "${{ matrix.python }}" | tr '.' '_')
           export DB_URL="postgresql://postgres:postgres@localhost:5432/$DATABASE_NAME"
-          cd lantern_pinecone
-          pytest
+          pytest test/test_pinecone.py
   lantern-django:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        python: ['3.12', '3.11', '3.10', '3.9', '3.8', '3.7']
+        python: ['3.13', '3.12', '3.11', '3.10', '3.9', '3.8']
     services:
       postgres:
-        image: lanterndata/lantern-suite:latest-pg15
+        image: lanterndata/lantern-self-hosted:lantern-0.4.1-extras-0.4.1-minor-1
         env:
           POSTGRES_PASSWORD: postgres
         ports:
@@ -106,5 +106,4 @@ jobs:
           python3 -m pip install pytest
           DATABASE_NAME=db_$(echo "${{ matrix.python }}" | tr '.' '_')
           export DB_URL="postgresql://postgres:postgres@localhost:5432/$DATABASE_NAME"
-          cd lantern_django
-          pytest
+          pytest test/test_django.py
