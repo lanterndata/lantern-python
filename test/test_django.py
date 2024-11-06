@@ -1,3 +1,4 @@
+import pytest
 import os
 import django
 from django.conf import settings
@@ -146,7 +147,7 @@ class TestDjango:
         distance = L2Distance("embedding", TextEmbedding("BAAI/bge-small-en", "hello"))
         results = Item.objects.annotate(distance=distance).order_by("distance")
         assert [v.id for v in results] == [1, 3, 2]
-        assert [v.distance for v in results] == [93.582954, 95.4551, 103.85861]
+        assert [v.distance for v in results] == pytest.approx([93.582954, 95.4551, 103.85861], rel=1e-6)
 
     def test_limit(self):
         create_items()
