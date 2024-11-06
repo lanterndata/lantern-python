@@ -26,7 +26,7 @@ setuptools.setup(
     python_requires=">=3.8",
     install_requires=[
         "lantern-client ==0.0.5",
-        "tqdm ==4.66.1",
+        "tqdm >=4.66.3",
         "pinecone-client ==2.2.4",
     ],
 )
