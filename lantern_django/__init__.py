@@ -50,7 +50,7 @@ class LanternExtrasExtension(CreateExtension):
 
 
 class HnswIndex(PostgresIndex):
-    suffix = "hnsw"
+    suffix = "lantern_hnsw"
 
     def __init__(
         self, *expressions, m=None, ef=None, ef_construction=None, dim=None, **kwargs

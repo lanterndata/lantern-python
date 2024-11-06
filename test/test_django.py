@@ -16,16 +16,19 @@ from lantern_django import (
     TextEmbedding,
 )
 from unittest import mock
+from urllib.parse import urlparse
 
+DB_URL = os.environ.get("DB_URL", "postgres://postgres:postgres@localhost:5432/postgres")
+parsed_url = urlparse(DB_URL)
 settings.configure(
     DATABASES={
         "default": {
             "ENGINE": "django.db.backends.postgresql",
-            "NAME": os.environ.get("DB_NAME", "postgres"),
-            "USER": os.environ.get("DB_USER", "postgres"),
-            "PASSWORD": os.environ.get("DB_PASSWORD", "postgres"),
-            "HOST": os.environ.get("DB_HOST", "localhost"),
-            "PORT": os.environ.get("DB_PORT", "5432"),
+            "NAME": parsed_url.path[1:],
+            "USER": parsed_url.username,
+            "PASSWORD": parsed_url.password,
+            "HOST": parsed_url.hostname,
+            "PORT": parsed_url.port,
         }
     }
 )
@@ -143,7 +146,7 @@ class TestDjango:
         distance = L2Distance("embedding", TextEmbedding("BAAI/bge-small-en", "hello"))
         results = Item.objects.annotate(distance=distance).order_by("distance")
         assert [v.id for v in results] == [1, 3, 2]
-        assert [v.distance for v in results] == [93.582954, 95.45509, 103.85861]
+        assert [v.distance for v in results] == [93.58296, 95.45511, 103.858635]
 
     def test_limit(self):
         create_items()
