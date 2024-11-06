@@ -24,5 +24,5 @@ setuptools.setup(
     packages=["lantern"],
     package_dir={"lantern": "."},
     python_requires=">=3.7",
-    install_requires=["psycopg2-binary ==2.9.9", "numpy"],
+    install_requires=["psycopg2-binary ==2.9.10", "numpy"],
 )
