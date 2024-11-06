@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setuptools.setup(
     name="lantern-django",
-    version="0.0.0",
+    version="0.0.1",
     description="Django client for Lantern",
     url="https://github.com/lanterndata/lantern-python",
     author="Di Qi",
