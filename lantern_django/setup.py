@@ -23,6 +23,6 @@ setuptools.setup(
     ],
     packages=["lantern_django"],
     package_dir={"lantern_django": "."},
-    python_requires=">=3.7",
+    python_requires=">=3.8",
     install_requires=["django", "numpy"],
 )
