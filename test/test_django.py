@@ -146,7 +146,7 @@ class TestDjango:
         distance = L2Distance("embedding", TextEmbedding("BAAI/bge-small-en", "hello"))
         results = Item.objects.annotate(distance=distance).order_by("distance")
         assert [v.id for v in results] == [1, 3, 2]
-        assert [v.distance for v in results] == [93.58296, 95.45511, 103.858635]
+        assert [v.distance for v in results] == [93.582954, 95.4551, 103.85861]
 
     def test_limit(self):
         create_items()
